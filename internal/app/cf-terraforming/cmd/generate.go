@@ -1034,6 +1034,62 @@ func generateResources() func(cmd *cobra.Command, args []string) {
 				log.Fatal(err)
 			}
 			jsonStructData = []interface{}{jsonPayloadInterface}
+		case "cloudflare_web_analytics_rule":
+			sites, _, err := api.ListWebAnalyticsSites(context.Background(), cloudflare.AccountIdentifier(accountID), cloudflare.ListWebAnalyticsSitesParams{})
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			var allRules []struct {
+				ID        string   `json:"id"`
+				AccountID string   `json:"account_id"`
+				RulesetID string   `json:"ruleset_id"`
+				Host      string   `json:"host"`
+				Paths     []string `json:"paths"`
+				Inclusive bool     `json:"inclusive"`
+				IsPaused  bool     `json:"is_paused"`
+			}
+			for _, site := range sites {
+				// skip sites with no rules/ruleset
+				if site.Ruleset.ID == "" {
+					continue
+				}
+				ruleset, err := api.ListWebAnalyticsRules(context.Background(), cloudflare.AccountIdentifier(accountID), cloudflare.ListWebAnalyticsRulesParams{
+					RulesetID: site.Ruleset.ID,
+				})
+				if err != nil {
+					log.Fatal(err)
+				}
+				for _, rule := range ruleset.Rules {
+					allRules = append(allRules, struct {
+						ID        string   `json:"id"`
+						AccountID string   `json:"account_id"`
+						RulesetID string   `json:"ruleset_id"`
+						Host      string   `json:"host"`
+						Paths     []string `json:"paths"`
+						Inclusive bool     `json:"inclusive"`
+						IsPaused  bool     `json:"is_paused"`
+					}{
+						ID:        rule.ID,
+						AccountID: accountID,
+						RulesetID: ruleset.Ruleset.ID,
+						Host:      rule.Host,
+						Paths:     rule.Paths,
+						Inclusive: rule.Inclusive,
+						IsPaused:  rule.IsPaused,
+					})
+				}
+
+			}
+			resourceCount = len(allRules)
+			m, err := json.Marshal(allRules)
+			if err != nil {
+				log.Fatal(err)
+			}
+			err = json.Unmarshal(m, &jsonStructData)
+			if err != nil {
+				log.Fatal(err)
+			}
 		case "cloudflare_workers_kv_namespace":
 			jsonPayload, _, err := api.ListWorkersKVNamespaces(context.Background(), identifier, cloudflare.ListWorkersKVNamespacesParams{})
 			if err != nil {
